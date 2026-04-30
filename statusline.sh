@@ -278,12 +278,8 @@ print('yes' if d.get('enabledPlugins',{}).get('caveman@caveman',False) else 'no'
       off|lite|full|ultra|wenyan-lite|wenyan|wenyan-full|wenyan-ultra|commit|review|compress) ;;
       *) return ;;
     esac
-    if [ -z "$mode" ] || [ "$mode" = "full" ]; then
-        printf '\033[38;5;172m🦴 CAVEMAN\033[0m'
-    else
-        local suffix=$(printf '%s' "$mode" | tr '[:lower:]' '[:upper:]')
-        printf '\033[38;5;172m🦴 CAVEMAN:%s\033[0m' "$suffix"
-    fi
+    local suffix=$(printf '%s' "$mode" | tr '[:lower:]' '[:upper:]')
+    printf '\033[38;5;172m🦴 CAVEMAN:%s\033[0m' "$suffix"
 }
 
 main() {
