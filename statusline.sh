@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
 # ============================================
-# Claude Code Kimi Statusline
-# 炫酷状态栏 — 直接查询 Kimi API 用量
-# ============================================
-# 仓库: https://github.com/junmingcode/claude-code-kimi-statusline
-# License: MIT
+# Claude Code 炫酷状态栏 — 直接查询 Kimi API
 # ============================================
 
-set -e
+set +e
 
 # 颜色定义
 RESET="\033[0m"
@@ -42,6 +38,27 @@ API_KEY="${ANTHROPIC_AUTH_TOKEN:-}"
 USAGE_API="https://api.kimi.com/coding/v1/usages"
 CACHE_FILE="$HOME/.claude/token_usage_cache.json"
 CACHE_TTL=30  # 缓存30秒，避免频繁请求
+
+# Python 可用时将 Unix 路径转为 Windows 路径
+to_win_path() {
+    local p="$1"
+    if [[ "$p" == /c/* ]]; then
+        echo "C:${p#/c}"
+    elif [[ "$p" == /d/* ]]; then
+        echo "D:${p#/d}"
+    else
+        echo "$p"
+    fi
+}
+
+# Python 命令（Windows 上 python3 可能是 stub）
+if command -v python >/dev/null 2>&1 && python -c "pass" 2>/dev/null; then
+    PY_CMD="python"
+elif command -v python3 >/dev/null 2>&1 && python3 -c "pass" 2>/dev/null; then
+    PY_CMD="python3"
+else
+    PY_CMD=""
+fi
 
 # 获取模型名称
 get_model_name() {
@@ -142,8 +159,8 @@ fetch_kimi_usage() {
     local http_code=""
     if command -v curl >/dev/null 2>&1; then
         resp=$(curl -s -m 3 -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" "$USAGE_API" 2>/dev/null || echo "{}")
-    elif command -v python3 >/dev/null 2>&1; then
-        resp=$(python3 -c "
+    elif [ -n "$PY_CMD" ]; then
+        resp=$($PY_CMD -c "
 import urllib.request, json, sys
 try:
     req = urllib.request.Request('$USAGE_API', headers={'Authorization': 'Bearer $API_KEY', 'Content-Type': 'application/json'})
@@ -159,8 +176,8 @@ except Exception as e:
 
     # 解析 JSON
     local result=""
-    if command -v python3 >/dev/null 2>&1; then
-        result=$(python3 -c "
+    if [ -n "$PY_CMD" ]; then
+        result=$($PY_CMD -c "
 import json, sys
 try:
     d = json.loads(sys.stdin.read())
@@ -231,7 +248,46 @@ get_time() {
 }
 
 # 主输出函数
+# 获取 caveman 模式徽章
+get_caveman_badge() {
+    # 先检查插件是否启用
+    local settings="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+    local plugin_found=false
+    if [ -f "$settings" ]; then
+        local py_cmd="$PY_CMD"
+        if [ -n "$py_cmd" ]; then
+            local win_settings=$(to_win_path "$settings")
+            local enabled=$($py_cmd -c "
+import json,sys
+d=json.load(open('$win_settings'))
+print('yes' if d.get('enabledPlugins',{}).get('caveman@caveman',False) else 'no')
+" 2>/dev/null || echo "no")
+            [ "$enabled" = "yes" ] && plugin_found=true
+        elif command -v grep >/dev/null 2>&1; then
+            grep -q '"caveman@caveman".*:.*true' "$settings" 2>/dev/null && plugin_found=true
+        fi
+    fi
+    [ "$plugin_found" = "false" ] && return
+
+    local flag="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.caveman-active"
+    [ -L "$flag" ] && return
+    [ ! -f "$flag" ] && return
+    local mode=$(head -c 64 "$flag" 2>/dev/null | tr -d '\n\r' | tr '[:upper:]' '[:lower:]')
+    mode=$(printf '%s' "$mode" | tr -cd 'a-z0-9-')
+    case "$mode" in
+      off|lite|full|ultra|wenyan-lite|wenyan|wenyan-full|wenyan-ultra|commit|review|compress) ;;
+      *) return ;;
+    esac
+    if [ -z "$mode" ] || [ "$mode" = "full" ]; then
+        printf '\033[38;5;172m🦴 CAVEMAN\033[0m'
+    else
+        local suffix=$(printf '%s' "$mode" | tr '[:lower:]' '[:upper:]')
+        printf '\033[38;5;172m🦴 CAVEMAN:%s\033[0m' "$suffix"
+    fi
+}
+
 main() {
+    local caveman_badge=$(get_caveman_badge)
     local model=$(get_model_name)
     local git_info=$(get_git_info)
     local pwd_short=$(get_pwd)
@@ -247,6 +303,12 @@ main() {
     local status=$(echo "$usage_str" | cut -d'|' -f7)
 
     local output=""
+
+    # Caveman 徽章
+    if [ -n "$caveman_badge" ]; then
+        output+="${caveman_badge}"
+        output+=" ${DIM}│${RESET} "
+    fi
 
     # 模型信息
     output+="${BG_BLUE}${BOLD} ${ICON_MODEL} ${model} ${RESET}"
@@ -289,7 +351,7 @@ main() {
     # 时间
     output+="${DIM}${ICON_TIME} ${time_str}${RESET}"
 
-    # 项目标识（可自定义）
+    # 项目标识
     if [[ "$pwd_short" == *"tomato"* ]] || [[ "$PWD" == *"gitee-scan"* ]]; then
         output+=" ${DIM}│${RESET} "
         output+="${BRIGHT_RED}${ICON_FIRE} gitee-scan${RESET}"
