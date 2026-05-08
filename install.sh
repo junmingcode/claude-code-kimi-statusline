@@ -37,8 +37,28 @@ echo -e "${GREEN}  ✓ 已复制到 $STATUSLINE_FILE${NC}"
 echo -e "${BLUE}[2/3] 配置 settings.json...${NC}"
 
 # 使用 Python 处理 JSON（更可靠）
-if command -v python3 >/dev/null 2>&1; then
-    python3 -c "
+PYTHON_CMD=""
+if command -v python3 >/dev/null 2>&1 && python3 -c "pass" 2>/dev/null; then
+    PYTHON_CMD="python3"
+elif command -v python >/dev/null 2>&1 && python -c "pass" 2>/dev/null; then
+    PYTHON_CMD="python"
+else
+    echo -e "${RED}  ✗ 未找到可用的 Python 命令${NC}"
+    echo -e "${YELLOW}  请手动编辑 $SETTINGS_FILE，添加以下内容：${NC}"
+    cat << 'EOF'
+
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/statusline.sh"
+  }
+}
+
+EOF
+    exit 1
+fi
+
+$PYTHON_CMD -c "
 import json
 import os
 
@@ -97,7 +117,6 @@ print('settings.json 已更新')
 EOF
     exit 1
 }
-fi
 
 echo -e "${GREEN}  ✓ settings.json 已更新${NC}"
 
