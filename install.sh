@@ -42,23 +42,11 @@ if command -v python3 >/dev/null 2>&1 && python3 -c "pass" 2>/dev/null; then
     PYTHON_CMD="python3"
 elif command -v python >/dev/null 2>&1 && python -c "pass" 2>/dev/null; then
     PYTHON_CMD="python"
-else
-    echo -e "${RED}  ✗ 未找到可用的 Python 命令${NC}"
-    echo -e "${YELLOW}  请手动编辑 $SETTINGS_FILE，添加以下内容：${NC}"
-    cat << 'EOF'
-
-{
-  "statusLine": {
-    "type": "command",
-    "command": "bash ~/.claude/statusline.sh"
-  }
-}
-
-EOF
-    exit 1
 fi
 
-$PYTHON_CMD -c "
+if [ -n "$PYTHON_CMD" ]; then
+    # 使用 Python 合并现有配置
+    $PYTHON_CMD -c "
 import json
 import os
 
@@ -103,9 +91,9 @@ with open(settings_path, 'w', encoding='utf-8') as f:
 
 print('settings.json 已更新')
 " || {
-    echo -e "${RED}  ✗ Python 处理 settings.json 失败${NC}"
-    echo -e "${YELLOW}  请手动编辑 $SETTINGS_FILE，添加以下内容：${NC}"
-    cat << 'EOF'
+        echo -e "${RED}  ✗ Python 处理 settings.json 失败${NC}"
+        echo -e "${YELLOW}  请手动编辑 $SETTINGS_FILE，添加以下内容：${NC}"
+        cat << 'EOF'
 
 {
   "statusLine": {
@@ -115,8 +103,28 @@ print('settings.json 已更新')
 }
 
 EOF
-    exit 1
+        exit 1
+    }
+else
+    # 无 Python，用纯 bash 写入（不保留现有配置）
+    echo -e "${YELLOW}[提示] 未找到 Python，将直接写入 settings.json（现有配置会被覆盖）${NC}"
+    mkdir -p "$(dirname "$SETTINGS_FILE")"
+    cat > "$SETTINGS_FILE" << 'EOF'
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://api.kimi.com/coding/",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "kimi-for-coding",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "kimi-for-coding",
+    "ANTHROPIC_SMALL_FAST_MODEL": "kimi-for-coding"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/statusline.sh"
+  }
 }
+EOF
+    echo -e "${GREEN}  ✓ settings.json 已写入${NC}"
+fi
 
 echo -e "${GREEN}  ✓ settings.json 已更新${NC}"
 
