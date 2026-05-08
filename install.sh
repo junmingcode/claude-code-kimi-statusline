@@ -106,10 +106,11 @@ EOF
         exit 1
     }
 else
-    # 无 Python，用纯 bash 写入（不保留现有配置）
-    echo -e "${YELLOW}[提示] 未找到 Python，将直接写入 settings.json（现有配置会被覆盖）${NC}"
-    mkdir -p "$(dirname "$SETTINGS_FILE")"
-    cat > "$SETTINGS_FILE" << 'EOF'
+    # 无 Python，提示手动配置
+    echo -e "${YELLOW}[提示] 未找到可用的 Python，无法自动合并配置${NC}"
+    echo -e "${YELLOW}  请手动编辑 $SETTINGS_FILE，确保包含以下内容：${NC}"
+    cat << 'EOF'
+
 {
   "env": {
     "ANTHROPIC_BASE_URL": "https://api.kimi.com/coding/",
@@ -122,8 +123,9 @@ else
     "command": "bash ~/.claude/statusline.sh"
   }
 }
+
 EOF
-    echo -e "${GREEN}  ✓ settings.json 已写入${NC}"
+    echo -e "${YELLOW}  如果 settings.json 已有其他配置，请手动合并，不要直接覆盖${NC}"
 fi
 
 echo -e "${GREEN}  ✓ settings.json 已更新${NC}"
