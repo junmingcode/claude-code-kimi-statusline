@@ -97,6 +97,7 @@ print('settings.json 已更新')
 EOF
     exit 1
 }
+fi
 
 echo -e "${GREEN}  ✓ settings.json 已更新${NC}"
 
